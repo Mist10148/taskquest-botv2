@@ -21,11 +21,34 @@
 require('dotenv').config();
 
 const { Client, GatewayIntentBits, Events, ActivityType, MessageFlags, Partials } = require('discord.js');
+const http = require('http');
 const db = require('./database/db');
 const listCommand = require('./commands/list');
 const gamification = require('./commands/gamification');
 const gameCommand = require('./commands/game');
 const sessionManager = require('./utils/games/sessionManager');
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  🌐 KEEP-ALIVE SERVER (for Render free tier)
+// ═══════════════════════════════════════════════════════════════════════════════
+const server = http.createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ 
+        status: 'online', 
+        bot: 'TaskQuest',
+        version: '3.8.0',
+        uptime: process.uptime()
+    }));
+});
+
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+    console.log(`🌐 Keep-alive server running on port ${PORT}`);
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  🤖 DISCORD CLIENT
+// ═══════════════════════════════════════════════════════════════════════════════
 
 const client = new Client({
     intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers, GatewayIntentBits.DirectMessages],
@@ -294,6 +317,7 @@ process.on('uncaughtException', (e) => { log('❌', 'UNCAUGHT', e.message); setT
 process.on('SIGINT', async () => {
     log('🛑', 'SHUTDOWN', 'Goodbye!');
     try { await db.closePool(); } catch (e) {}
+    server.close();
     client.destroy();
     process.exit(0);
 });
