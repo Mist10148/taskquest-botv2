@@ -15,6 +15,19 @@ const db = require('../../database/db');
 const SESSION_TIMEOUT_MINUTES = 30;
 
 /**
+ * Safely parse JSON - handles already-parsed objects from TiDB
+ */
+function safeJsonParse(value) {
+    if (!value) return null;
+    if (typeof value === 'object') return value;
+    try {
+        return JSON.parse(value);
+    } catch (e) {
+        return value;
+    }
+}
+
+/**
  * Check if user has an active game session
  */
 async function hasActiveSession(userId, gameType = null) {
@@ -51,10 +64,10 @@ async function getActiveSession(userId, gameType) {
     
     const session = rows[0];
     
-    // Parse JSON fields
-    if (session.player_hand) session.player_hand = JSON.parse(session.player_hand);
-    if (session.dealer_hand) session.dealer_hand = JSON.parse(session.dealer_hand);
-    if (session.deck_state) session.deck_state = JSON.parse(session.deck_state);
+    // Parse JSON fields safely (TiDB may return objects or strings)
+    session.player_hand = safeJsonParse(session.player_hand);
+    session.dealer_hand = safeJsonParse(session.dealer_hand);
+    session.deck_state = safeJsonParse(session.deck_state);
     
     return session;
 }
@@ -86,7 +99,7 @@ async function createBlackjackHand(sessionId, playerHand, dealerHand, deckState)
     
     const { calculateHandValue } = require('./deck');
     const playerValue = calculateHandValue(playerHand).value;
-    const dealerValue = calculateHandValue([dealerHand[0]]).value; // Only first card visible
+    const dealerValue = calculateHandValue([dealerHand[0]]).value;
     
     await pool.execute(
         `INSERT INTO blackjack_hands (session_id, player_hand, dealer_hand, deck_state, player_value, dealer_value)
@@ -163,9 +176,9 @@ async function getSessionById(sessionId) {
     if (rows.length === 0) return null;
     
     const session = rows[0];
-    if (session.player_hand) session.player_hand = JSON.parse(session.player_hand);
-    if (session.dealer_hand) session.dealer_hand = JSON.parse(session.dealer_hand);
-    if (session.deck_state) session.deck_state = JSON.parse(session.deck_state);
+    session.player_hand = safeJsonParse(session.player_hand);
+    session.dealer_hand = safeJsonParse(session.dealer_hand);
+    session.deck_state = safeJsonParse(session.deck_state);
     
     return session;
 }
