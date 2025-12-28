@@ -149,7 +149,8 @@ async function updateUser(id, updates) {
 
 async function getLeaderboard(limit = 10) {
     const p = await getPool();
-    const [rows] = await p.execute('SELECT * FROM users WHERE gamification_enabled = TRUE ORDER BY player_xp DESC LIMIT ?', [limit]);
+    const safeLimit = parseInt(limit) || 10;
+    const [rows] = await p.execute(`SELECT * FROM users WHERE gamification_enabled = TRUE ORDER BY player_xp DESC LIMIT ${safeLimit}`);
     return rows;
 }
 
