@@ -61,6 +61,8 @@ function formatTimeRemaining(ms) {
 }
 
 async function daily(interaction) {
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    
     const userId = interaction.user.id;
     const user = await db.getOrCreateUser(userId);
     
@@ -72,30 +74,52 @@ async function daily(interaction) {
     if (lastClaim && timeSinceClaim < DAILY_COOLDOWN_MS) {
         const timeRemaining = DAILY_COOLDOWN_MS - timeSinceClaim;
         
-        return interaction.reply({
+        return interaction.editReply({
             embeds: [new EmbedBuilder()
                 .setColor(0xFEE75C)
                 .setTitle('⏰ Already Claimed!')
                 .setDescription(`You've already claimed your daily XP.`)
-                .addFields({ 
-                    name: '⏱️ Time Remaining', 
-                    value: formatTimeRemaining(timeRemaining), 
-                    inline: true 
-                })
+                .addFields(
+                    { name: '⏱️ Time Remaining', value: formatTimeRemaining(timeRemaining), inline: true },
+                    { name: '🔥 Current Streak', value: `${user.streak_count || 0} days`, inline: true }
+                )
                 .setFooter({ text: 'Come back when the timer resets!' })
-            ],
-            flags: MessageFlags.Ephemeral
+            ]
         });
     }
     
+    // Calculate streak
+    const STREAK_WINDOW_MS = 48 * 60 * 60 * 1000; // 48 hours to maintain streak
+    let newStreak;
+    let streakMaintained = false;
+    let streakBroken = false;
+    
+    if (!lastClaim) {
+        // First time claiming
+        newStreak = 1;
+    } else if (timeSinceClaim <= STREAK_WINDOW_MS) {
+        // Claimed within 48 hours - streak continues!
+        newStreak = (user.streak_count || 0) + 1;
+        streakMaintained = true;
+    } else {
+        // More than 48 hours - streak broken
+        newStreak = 1;
+        streakBroken = user.streak_count > 1;
+    }
+    
+    // Calculate bonus XP from streak (5 XP per streak day, max +50)
+    const streakBonus = Math.min((newStreak - 1) * 5, 50);
+    const totalXP = DAILY_XP + streakBonus;
+    
     // Award daily XP
-    const newXP = user.player_xp + DAILY_XP;
+    const newXP = user.player_xp + totalXP;
     const newLevel = Math.floor(newXP / 100) + 1;
     const leveledUp = newLevel > user.player_level;
     
     await db.updateUser(userId, {
         player_xp: newXP,
         player_level: newLevel,
+        streak_count: newStreak,
         last_daily_claim: new Date().toISOString()
     });
     
@@ -105,33 +129,52 @@ async function daily(interaction) {
         await pool.execute(
             `INSERT INTO xp_transactions (discord_id, amount, source, balance_before, balance_after)
              VALUES (?, ?, 'daily', ?, ?)`,
-            [userId, DAILY_XP, user.player_xp, newXP]
+            [userId, totalXP, user.player_xp, newXP]
         );
     } catch (e) { /* Table might not exist yet */ }
     
+    // Build embed
     const embed = new EmbedBuilder()
         .setColor(0x57F287)
         .setTitle('🎁 Daily Reward Claimed!')
-        .setDescription(`You received **+${DAILY_XP} XP**!`)
+        .setDescription(streakBonus > 0 
+            ? `You received **+${DAILY_XP} XP** + **+${streakBonus} XP** streak bonus!`
+            : `You received **+${DAILY_XP} XP**!`)
         .addFields(
             { name: '💰 Balance', value: `${newXP.toLocaleString()} XP`, inline: true },
-            { name: '📊 Level', value: `${newLevel}`, inline: true }
+            { name: '📊 Level', value: `${newLevel}`, inline: true },
+            { name: '🔥 Streak', value: `${newStreak} day${newStreak > 1 ? 's' : ''}`, inline: true }
         )
-        .setFooter({ text: 'Come back in 24 hours!' });
+        .setFooter({ text: 'Come back in 24 hours to keep your streak!' });
     
     if (leveledUp) {
         embed.addFields({ name: '🎉 Level Up!', value: `You reached **Level ${newLevel}**!`, inline: false });
     }
     
-    await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+    if (streakBroken) {
+        embed.addFields({ name: '💔 Streak Lost', value: `Your ${user.streak_count}-day streak was reset. Start again!`, inline: false });
+    }
+    
+    if (newStreak === 7) {
+        embed.addFields({ name: '🎊 Week Streak!', value: `Amazing! 7 days in a row!`, inline: false });
+    } else if (newStreak === 30) {
+        embed.addFields({ name: '🏆 Month Streak!', value: `Incredible! 30 days in a row!`, inline: false });
+    }
+    
+    await interaction.editReply({ embeds: [embed] });
     
     // Check achievements
     const updatedUser = await db.getUser(userId);
     const achs = await db.getAchievements(userId);
-    const newAchs = checkAchievements(updatedUser, achs.map(a => a.achievement_key));
-    for (const a of newAchs) {
-        await db.unlockAchievement(userId, a.key);
-        await interaction.followUp({ embeds: [ui.achievementUnlockEmbed(a)], flags: MessageFlags.Ephemeral });
+    const unlockedKeys = achs.map(a => a.achievement_key);
+    const newAchs = checkAchievements(updatedUser, unlockedKeys);
+    
+    for (const ach of newAchs) {
+        await db.unlockAchievement(userId, ach.key);
+        await interaction.followUp({
+            embeds: [ui.achievementEmbed(ach)],
+            flags: MessageFlags.Ephemeral
+        });
     }
 }
 
