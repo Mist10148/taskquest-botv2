@@ -118,9 +118,10 @@ async function getMaxBet(userId, maxBetPercent = 0.25, hardCap = 1000) {
  */
 async function getTransactionHistory(userId, limit = 10) {
     const pool = await db.getPool();
+    const safeLimit = parseInt(limit) || 10;
     const [rows] = await pool.execute(
-        `SELECT * FROM xp_transactions WHERE discord_id = ? ORDER BY created_at DESC LIMIT ?`,
-        [userId, limit]
+        `SELECT * FROM xp_transactions WHERE discord_id = ? ORDER BY created_at DESC LIMIT ${safeLimit}`,
+        [userId]
     );
     return rows;
 }

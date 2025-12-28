@@ -140,8 +140,7 @@ async function expireOldSessions() {
     const [result] = await pool.execute(
         `UPDATE game_sessions 
          SET state = 'expired', ended_at = NOW() 
-         WHERE state = 'active' AND started_at < DATE_SUB(NOW(), INTERVAL ? MINUTE)`,
-        [SESSION_TIMEOUT_MINUTES]
+         WHERE state = 'active' AND started_at < DATE_SUB(NOW(), INTERVAL ${SESSION_TIMEOUT_MINUTES} MINUTE)`
     );
     
     return result.affectedRows;
@@ -176,6 +175,7 @@ async function getSessionById(sessionId) {
  */
 async function getGameHistory(userId, gameType = null, limit = 10) {
     const pool = await db.getPool();
+    const safeLimit = parseInt(limit) || 10;
     
     let query = `SELECT * FROM game_sessions WHERE discord_id = ?`;
     const params = [userId];
@@ -185,8 +185,7 @@ async function getGameHistory(userId, gameType = null, limit = 10) {
         params.push(gameType);
     }
     
-    query += ` ORDER BY started_at DESC LIMIT ?`;
-    params.push(limit);
+    query += ` ORDER BY started_at DESC LIMIT ${safeLimit}`;
     
     const [rows] = await pool.execute(query, params);
     return rows;
