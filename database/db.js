@@ -493,10 +493,13 @@ async function getGameStats(discordId) {
 async function recordGameResult(discordId, gameType, state, payout = 0) {
     const pool = await getPool();
     
+    // For non-betting games like RPS, store payout as bet_amount too for display
+    const betAmount = (gameType === 'rps' || gameType === 'hangman') ? payout : 0;
+    
     await pool.execute(
         `INSERT INTO game_sessions (discord_id, game_type, bet_amount, state, payout, ended_at) 
-         VALUES (?, ?, 0, ?, ?, NOW())`,
-        [discordId, gameType, state, payout]
+         VALUES (?, ?, ?, ?, ?, NOW())`,
+        [discordId, gameType, betAmount, state, payout]
     );
 }
 
