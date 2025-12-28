@@ -15,19 +15,6 @@ const db = require('../../database/db');
 const SESSION_TIMEOUT_MINUTES = 30;
 
 /**
- * Safely parse JSON - handles already-parsed objects
- */
-function safeJsonParse(value) {
-    if (!value) return null;
-    if (typeof value === 'object') return value; // Already parsed
-    try {
-        return JSON.parse(value);
-    } catch (e) {
-        return value;
-    }
-}
-
-/**
  * Check if user has an active game session
  */
 async function hasActiveSession(userId, gameType = null) {
@@ -64,10 +51,10 @@ async function getActiveSession(userId, gameType) {
     
     const session = rows[0];
     
-    // Parse JSON fields safely (handles both string and already-parsed objects)
-    session.player_hand = safeJsonParse(session.player_hand);
-    session.dealer_hand = safeJsonParse(session.dealer_hand);
-    session.deck_state = safeJsonParse(session.deck_state);
+    // Parse JSON fields
+    if (session.player_hand) session.player_hand = JSON.parse(session.player_hand);
+    if (session.dealer_hand) session.dealer_hand = JSON.parse(session.dealer_hand);
+    if (session.deck_state) session.deck_state = JSON.parse(session.deck_state);
     
     return session;
 }
@@ -176,9 +163,9 @@ async function getSessionById(sessionId) {
     if (rows.length === 0) return null;
     
     const session = rows[0];
-    session.player_hand = safeJsonParse(session.player_hand);
-    session.dealer_hand = safeJsonParse(session.dealer_hand);
-    session.deck_state = safeJsonParse(session.deck_state);
+    if (session.player_hand) session.player_hand = JSON.parse(session.player_hand);
+    if (session.dealer_hand) session.dealer_hand = JSON.parse(session.dealer_hand);
+    if (session.deck_state) session.deck_state = JSON.parse(session.deck_state);
     
     return session;
 }
