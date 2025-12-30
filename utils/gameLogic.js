@@ -618,34 +618,102 @@ function getSkillBonuses(userSkills, playerClass) {
         flatXPBonus: 0,
         dailyBonus: 0,
         critChance: 0,
-        luckBonus: 0
+        luckBonus: 0,
+        streakProtect: false
     };
     
     if (!userSkills || !userSkills.length) return bonuses;
     
     const skillMap = new Map(userSkills.map(s => [s.skill_id, s.skill_level]));
     
-    // Apply skill effects
+    // Default tree skills
     if (skillMap.has('default_xp_boost')) {
-        bonuses.xpMultiplier += skillMap.get('default_xp_boost') * 0.05;
+        bonuses.xpMultiplier += skillMap.get('default_xp_boost') * 0.05; // +5% per level
     }
     if (skillMap.has('default_daily_boost')) {
-        bonuses.dailyBonus += skillMap.get('default_daily_boost') * 10;
+        bonuses.dailyBonus += skillMap.get('default_daily_boost') * 10; // +10 daily XP per level
     }
+    if (skillMap.has('default_streak_shield')) {
+        bonuses.streakProtect = true; // Protect streak on miss
+    }
+    
+    // Hero tree skills
     if (skillMap.has('hero_valor')) {
-        bonuses.flatXPBonus += skillMap.get('hero_valor') * 10;
+        bonuses.flatXPBonus += skillMap.get('hero_valor') * 10; // +10 flat XP per level
+    }
+    if (skillMap.has('hero_inspire')) {
+        bonuses.xpMultiplier += skillMap.get('hero_inspire') * 0.08; // +8% per level
     }
     if (skillMap.has('hero_legend')) {
-        bonuses.xpMultiplier += 0.25;
+        bonuses.xpMultiplier += 0.25; // +25% XP
     }
+    
+    // Gambler tree skills
     if (skillMap.has('gambler_lucky')) {
-        bonuses.luckBonus += skillMap.get('gambler_lucky') * 5;
+        bonuses.luckBonus += skillMap.get('gambler_lucky') * 5; // +5% luck per level
     }
+    
+    // Assassin tree skills
     if (skillMap.has('assassin_critical')) {
-        bonuses.critChance += skillMap.get('assassin_critical') * 10;
+        bonuses.critChance += skillMap.get('assassin_critical') * 10; // +10% crit per level
+    }
+    
+    // Archer tree skills
+    if (skillMap.has('archer_aim')) {
+        bonuses.xpMultiplier += skillMap.get('archer_aim') * 0.03; // +3% per level
+    }
+    
+    // Tank tree skills
+    if (skillMap.has('tank_fortify')) {
+        bonuses.flatXPBonus += skillMap.get('tank_fortify') * 5; // +5 flat XP per level
+    }
+    
+    // Wizard tree skills
+    if (skillMap.has('wizard_study')) {
+        bonuses.flatXPBonus += skillMap.get('wizard_study') * 3; // +3 flat XP per level
     }
     
     return bonuses;
+}
+
+// Combined function: Apply both class AND skill bonuses
+function calculateFinalXP(user, userSkills, baseXP) {
+    // Step 1: Apply class bonus
+    const { finalXP: classXP, bonusInfo, userUpdates } = calculateClassXP(user, baseXP);
+    
+    // Step 2: Get skill bonuses
+    const skillBonuses = getSkillBonuses(userSkills, user.player_class);
+    
+    // Step 3: Apply skill multiplier and flat bonus
+    let finalXP = Math.floor(classXP * skillBonuses.xpMultiplier) + skillBonuses.flatXPBonus;
+    
+    // Step 4: Crit chance from skills
+    let critApplied = false;
+    if (skillBonuses.critChance > 0 && Math.random() * 100 < skillBonuses.critChance) {
+        const critBonus = Math.floor(finalXP * 0.5);
+        finalXP += critBonus;
+        critApplied = true;
+        bonusInfo.details += `\n💥 **SKILL CRIT!** +${critBonus} XP`;
+    }
+    
+    // Build skill bonus description
+    if (skillBonuses.xpMultiplier > 1.0) {
+        bonusInfo.details += `\n📚 **Skill Bonus:** +${Math.round((skillBonuses.xpMultiplier - 1) * 100)}%`;
+    }
+    if (skillBonuses.flatXPBonus > 0) {
+        bonusInfo.details += ` +${skillBonuses.flatXPBonus} flat`;
+    }
+    
+    return {
+        baseXP,
+        finalXP,
+        bonusInfo: {
+            ...bonusInfo,
+            skillBonuses,
+            critApplied
+        },
+        userUpdates
+    };
 }
 
 module.exports = {
@@ -655,6 +723,7 @@ module.exports = {
     calculateLevel,
     addXP,
     calculateClassXP,
+    calculateFinalXP,
     updateStreak,
     ACHIEVEMENTS,
     checkAchievements,
