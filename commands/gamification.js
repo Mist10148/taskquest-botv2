@@ -19,7 +19,7 @@
 const { SlashCommandBuilder, MessageFlags, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const db = require('../database/db');
 const ui = require('../utils/ui');
-const { CLASSES, SKILL_TREES, ACHIEVEMENTS, checkAchievements } = require('../utils/gameLogic');
+const { CLASSES, SKILL_TREES, ACHIEVEMENTS, checkAchievements, getSkillBonuses } = require('../utils/gameLogic');
 
 const pageState = new Map();
 
@@ -91,25 +91,27 @@ async function daily(interaction) {
     // Calculate streak
     const STREAK_WINDOW_MS = 48 * 60 * 60 * 1000; // 48 hours to maintain streak
     let newStreak;
-    let streakMaintained = false;
     let streakBroken = false;
     
     if (!lastClaim) {
-        // First time claiming
         newStreak = 1;
     } else if (timeSinceClaim <= STREAK_WINDOW_MS) {
-        // Claimed within 48 hours - streak continues!
         newStreak = (user.streak_count || 0) + 1;
-        streakMaintained = true;
     } else {
-        // More than 48 hours - streak broken
         newStreak = 1;
         streakBroken = user.streak_count > 1;
     }
     
-    // Calculate bonus XP from streak (5 XP per streak day, max +50)
+    // Calculate streak bonus (5 XP per streak day, max +50)
     const streakBonus = Math.min((newStreak - 1) * 5, 50);
-    const totalXP = DAILY_XP + streakBonus;
+    
+    // Get skill bonuses (Early Bird adds +10 daily XP per level)
+    const userSkills = await db.getUserSkills(userId);
+    const skillBonuses = getSkillBonuses(userSkills, user.player_class);
+    const skillDailyBonus = skillBonuses.dailyBonus || 0;
+    
+    // Calculate total XP
+    const totalXP = DAILY_XP + streakBonus + skillDailyBonus;
     
     // Award daily XP
     const newXP = user.player_xp + totalXP;
@@ -133,13 +135,16 @@ async function daily(interaction) {
         );
     } catch (e) { /* Table might not exist yet */ }
     
-    // Build embed
+    // Build description
+    let description = `You received **+${DAILY_XP} XP**`;
+    if (streakBonus > 0) description += ` + **+${streakBonus} XP** streak bonus`;
+    if (skillDailyBonus > 0) description += ` + **+${skillDailyBonus} XP** skill bonus`;
+    description += '!';
+    
     const embed = new EmbedBuilder()
         .setColor(0x57F287)
         .setTitle('🎁 Daily Reward Claimed!')
-        .setDescription(streakBonus > 0 
-            ? `You received **+${DAILY_XP} XP** + **+${streakBonus} XP** streak bonus!`
-            : `You received **+${DAILY_XP} XP**!`)
+        .setDescription(description)
         .addFields(
             { name: '💰 Balance', value: `${newXP.toLocaleString()} XP`, inline: true },
             { name: '📊 Level', value: `${newLevel}`, inline: true },
@@ -166,15 +171,10 @@ async function daily(interaction) {
     // Check achievements
     const updatedUser = await db.getUser(userId);
     const achs = await db.getAchievements(userId);
-    const unlockedKeys = achs.map(a => a.achievement_key);
-    const newAchs = checkAchievements(updatedUser, unlockedKeys);
-    
-    for (const ach of newAchs) {
-        await db.unlockAchievement(userId, ach.key);
-        await interaction.followUp({
-            embeds: [ui.achievementEmbed(ach)],
-            flags: MessageFlags.Ephemeral
-        });
+    const newAchs = checkAchievements(updatedUser, achs.map(a => a.achievement_key));
+    for (const a of newAchs) {
+        await db.unlockAchievement(userId, a.key);
+        await interaction.followUp({ embeds: [ui.achievementUnlockEmbed(a)], flags: MessageFlags.Ephemeral });
     }
 }
 

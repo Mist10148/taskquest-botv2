@@ -13,7 +13,7 @@
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const db = require('../database/db');
 const ui = require('../utils/ui');
-const { calculateClassXP, addXP, updateStreak, checkAchievements } = require('../utils/gameLogic');
+const { calculateFinalXP, addXP, updateStreak, checkAchievements } = require('../utils/gameLogic');
 
 const swapState = new Map();
 
@@ -407,7 +407,8 @@ async function handleSelectMenu(interaction) {
         if (newStatus) {
             let user = await db.getUser(userId);
             if (user.gamification_enabled) {
-                const { finalXP, bonusInfo, userUpdates } = calculateClassXP(user, 8);
+                const userSkills = await db.getUserSkills(userId);
+                const { finalXP, bonusInfo, userUpdates } = calculateFinalXP(user, userSkills, 8);
                 const xpResult = addXP(user, finalXP);
                 const streakResult = updateStreak(user);
                 await db.updateUser(userId, { player_xp: user.player_xp, player_level: user.player_level, ...userUpdates, ...streakResult.updates });
@@ -472,7 +473,8 @@ async function handleModal(interaction) {
         // Award XP (ephemeral)
         let user = await db.getUser(userId);
         if (user.gamification_enabled) {
-            const { finalXP, bonusInfo, userUpdates } = calculateClassXP(user, 10);
+            const userSkills = await db.getUserSkills(userId);
+            const { finalXP, bonusInfo, userUpdates } = calculateFinalXP(user, userSkills, 10);
             const xpResult = addXP(user, finalXP);
             const streakResult = updateStreak(user);
             await db.updateUser(userId, { player_xp: user.player_xp, player_level: user.player_level, ...userUpdates, ...streakResult.updates });
@@ -516,7 +518,8 @@ async function handleModal(interaction) {
         // Award XP (ephemeral)
         let user = await db.getUser(userId);
         if (user.gamification_enabled) {
-            const { finalXP, bonusInfo, userUpdates } = calculateClassXP(user, 5);
+            const userSkills = await db.getUserSkills(userId);
+            const { finalXP, bonusInfo, userUpdates } = calculateFinalXP(user, userSkills, 5);
             const xpResult = addXP(user, finalXP);
             const streakResult = updateStreak(user);
             await db.updateUser(userId, { player_xp: user.player_xp, player_level: user.player_level, ...userUpdates, ...streakResult.updates });
