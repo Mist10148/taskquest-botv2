@@ -19,7 +19,7 @@
 const { SlashCommandBuilder, MessageFlags, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const db = require('../database/db');
 const ui = require('../utils/ui');
-const { CLASSES, SKILL_TREES, ACHIEVEMENTS, checkAchievements, getSkillBonuses } = require('../utils/gameLogic');
+const { CLASSES, SKILL_TREES, ACHIEVEMENTS, checkAchievements, getSkillBonuses, calculateFinalXP } = require('../utils/gameLogic');
 
 const pageState = new Map();
 
@@ -105,13 +105,27 @@ async function daily(interaction) {
     // Calculate streak bonus (5 XP per streak day, max +50)
     const streakBonus = Math.min((newStreak - 1) * 5, 50);
     
-    // Get skill bonuses (Early Bird adds +10 daily XP per level)
+    // Get user skills
     const userSkills = await db.getUserSkills(userId);
+    
+    // Apply class and skill bonuses to base daily XP
+    let classBonus = 0;
+    let bonusInfo = { type: null, details: '' };
+    let userUpdates = {};
+    
+    if (user.gamification_enabled) {
+        const result = calculateFinalXP(user, userSkills, DAILY_XP);
+        classBonus = result.finalXP - DAILY_XP; // Extra XP from class/skill multipliers
+        bonusInfo = result.bonusInfo;
+        userUpdates = result.userUpdates;
+    }
+    
+    // Get skill daily bonus (Early Bird adds +10 daily XP per level)
     const skillBonuses = getSkillBonuses(userSkills, user.player_class);
     const skillDailyBonus = skillBonuses.dailyBonus || 0;
     
-    // Calculate total XP
-    const totalXP = DAILY_XP + streakBonus + skillDailyBonus;
+    // Calculate total XP: base + class bonus + streak + skill daily bonus
+    const totalXP = DAILY_XP + classBonus + streakBonus + skillDailyBonus;
     
     // Award daily XP
     const newXP = user.player_xp + totalXP;
@@ -122,7 +136,8 @@ async function daily(interaction) {
         player_xp: newXP,
         player_level: newLevel,
         streak_count: newStreak,
-        last_daily_claim: new Date().toISOString()
+        last_daily_claim: new Date().toISOString(),
+        ...userUpdates // Update class counters (assassin_streak, wizard_counter, etc.)
     });
     
     // Log transaction
@@ -137,9 +152,15 @@ async function daily(interaction) {
     
     // Build description
     let description = `You received **+${DAILY_XP} XP**`;
+    if (classBonus > 0) description += ` + **+${classBonus} XP** class bonus`;
     if (streakBonus > 0) description += ` + **+${streakBonus} XP** streak bonus`;
     if (skillDailyBonus > 0) description += ` + **+${skillDailyBonus} XP** skill bonus`;
     description += '!';
+    
+    // Add class bonus details if applicable
+    if (bonusInfo.details) {
+        description += `\n${bonusInfo.details}`;
+    }
     
     const embed = new EmbedBuilder()
         .setColor(0x57F287)
