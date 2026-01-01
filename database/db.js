@@ -51,73 +51,95 @@ async function closePool() { if (pool) { await pool.end(); pool = null; } }
 async function initializeDatabase() {
     const p = await getPool();
     
-    await p.execute(`CREATE TABLE IF NOT EXISTS users (
-        discord_id VARCHAR(32) PRIMARY KEY,
-        player_xp INT DEFAULT 0,
-        player_level INT DEFAULT 1,
-        player_class ENUM('DEFAULT','HERO','GAMBLER','ASSASSIN','WIZARD','ARCHER','TANK') DEFAULT 'DEFAULT',
-        gamification_enabled BOOLEAN DEFAULT TRUE,
-        automation_enabled BOOLEAN DEFAULT TRUE,
-        streak_count INT DEFAULT 0,
-        last_active_day DATE DEFAULT NULL,
-        owns_hero BOOLEAN DEFAULT FALSE,
-        owns_gambler BOOLEAN DEFAULT FALSE,
-        owns_assassin BOOLEAN DEFAULT FALSE,
-        owns_wizard BOOLEAN DEFAULT FALSE,
-        owns_archer BOOLEAN DEFAULT FALSE,
-        owns_tank BOOLEAN DEFAULT FALSE,
-        assassin_streak INT DEFAULT 0,
-        assassin_stacks INT DEFAULT 0,
-        wizard_counter INT DEFAULT 0,
-        archer_streak INT DEFAULT 0,
-        tank_stacks INT DEFAULT 0,
-        total_items_added INT DEFAULT 0,
-        total_items_completed INT DEFAULT 0,
-        total_lists_created INT DEFAULT 0,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )`);
-
-    await p.execute(`CREATE TABLE IF NOT EXISTS lists (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        discord_id VARCHAR(32) NOT NULL,
-        name VARCHAR(100) NOT NULL,
-        description TEXT DEFAULT NULL,
-        category VARCHAR(50) DEFAULT NULL,
-        deadline DATE DEFAULT NULL,
-        priority ENUM('LOW','MEDIUM','HIGH') DEFAULT NULL,
-        deadline_notified BOOLEAN DEFAULT FALSE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE KEY unique_user_list (discord_id, name),
-        FOREIGN KEY (discord_id) REFERENCES users(discord_id) ON DELETE CASCADE
-    )`);
-
-    await p.execute(`CREATE TABLE IF NOT EXISTS items (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        list_id INT NOT NULL,
-        name VARCHAR(200) NOT NULL,
-        description TEXT DEFAULT NULL,
-        completed BOOLEAN DEFAULT FALSE,
-        position INT DEFAULT 0,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (list_id) REFERENCES lists(id) ON DELETE CASCADE
-    )`);
-
-    await p.execute(`CREATE TABLE IF NOT EXISTS achievements (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        discord_id VARCHAR(32) NOT NULL,
-        achievement_key VARCHAR(50) NOT NULL,
-        unlocked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE KEY unique_achievement (discord_id, achievement_key),
-        FOREIGN KEY (discord_id) REFERENCES users(discord_id) ON DELETE CASCADE
-    )`);
+    // Run all CREATE TABLE statements in parallel for faster startup
+    await Promise.all([
+        p.execute(`CREATE TABLE IF NOT EXISTS users (
+            discord_id VARCHAR(32) PRIMARY KEY,
+            player_xp INT DEFAULT 0,
+            player_level INT DEFAULT 1,
+            player_class ENUM('DEFAULT','HERO','GAMBLER','ASSASSIN','WIZARD','ARCHER','TANK') DEFAULT 'DEFAULT',
+            gamification_enabled BOOLEAN DEFAULT TRUE,
+            automation_enabled BOOLEAN DEFAULT TRUE,
+            streak_count INT DEFAULT 0,
+            last_active_day DATE DEFAULT NULL,
+            last_daily_claim DATETIME DEFAULT NULL,
+            owns_hero BOOLEAN DEFAULT FALSE,
+            owns_gambler BOOLEAN DEFAULT FALSE,
+            owns_assassin BOOLEAN DEFAULT FALSE,
+            owns_wizard BOOLEAN DEFAULT FALSE,
+            owns_archer BOOLEAN DEFAULT FALSE,
+            owns_tank BOOLEAN DEFAULT FALSE,
+            assassin_streak INT DEFAULT 0,
+            assassin_stacks INT DEFAULT 0,
+            wizard_counter INT DEFAULT 0,
+            archer_streak INT DEFAULT 0,
+            tank_stacks INT DEFAULT 0,
+            total_items_added INT DEFAULT 0,
+            total_items_completed INT DEFAULT 0,
+            total_lists_created INT DEFAULT 0,
+            skill_points INT DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )`),
+        p.execute(`CREATE TABLE IF NOT EXISTS lists (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            discord_id VARCHAR(32) NOT NULL,
+            name VARCHAR(100) NOT NULL,
+            description TEXT DEFAULT NULL,
+            category VARCHAR(50) DEFAULT NULL,
+            deadline DATE DEFAULT NULL,
+            priority ENUM('LOW','MEDIUM','HIGH') DEFAULT NULL,
+            deadline_notified BOOLEAN DEFAULT FALSE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY unique_user_list (discord_id, name)
+        )`),
+        p.execute(`CREATE TABLE IF NOT EXISTS items (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            list_id INT NOT NULL,
+            name VARCHAR(200) NOT NULL,
+            description TEXT DEFAULT NULL,
+            completed BOOLEAN DEFAULT FALSE,
+            position INT DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )`),
+        p.execute(`CREATE TABLE IF NOT EXISTS achievements (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            discord_id VARCHAR(32) NOT NULL,
+            achievement_key VARCHAR(50) NOT NULL,
+            unlocked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY unique_achievement (discord_id, achievement_key)
+        )`),
+        p.execute(`CREATE TABLE IF NOT EXISTS user_skills (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            discord_id VARCHAR(32) NOT NULL,
+            skill_id VARCHAR(50) NOT NULL,
+            skill_level INT DEFAULT 1,
+            unlocked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY unique_skill (discord_id, skill_id)
+        )`),
+        p.execute(`CREATE TABLE IF NOT EXISTS game_sessions (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            discord_id VARCHAR(32) NOT NULL,
+            game_type VARCHAR(20) NOT NULL,
+            bet_amount INT DEFAULT 0,
+            state VARCHAR(20) DEFAULT 'active',
+            game_data JSON,
+            payout INT DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            ended_at TIMESTAMP NULL
+        )`),
+        p.execute(`CREATE TABLE IF NOT EXISTS xp_transactions (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            discord_id VARCHAR(32) NOT NULL,
+            amount INT NOT NULL,
+            source VARCHAR(50) NOT NULL,
+            balance_before INT DEFAULT 0,
+            balance_after INT DEFAULT 0,
+            reference_id INT DEFAULT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )`)
+    ]);
     
-    // Migration for existing DBs
-    const alters = [
-        'ALTER TABLE users ADD COLUMN automation_enabled BOOLEAN DEFAULT TRUE',
-        'ALTER TABLE lists ADD COLUMN description TEXT DEFAULT NULL',
-        'ALTER TABLE lists ADD COLUMN deadline_notified BOOLEAN DEFAULT FALSE'
-    ];
-    for (const q of alters) { try { await p.execute(q); } catch (e) {} }
+    console.log('✅ Database tables ready');
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
