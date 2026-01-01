@@ -512,11 +512,19 @@ async function getGameStats(discordId) {
  * @param {string} state - 'won', 'lost', 'push'
  * @param {number} payout - XP payout (0 for losses)
  */
-async function recordGameResult(discordId, gameType, state, payout = 0) {
+async function recordGameResult(discordId, gameType, state, xpGained = 0, betAmount = 0) {
     const pool = await getPool();
     
-    // For non-betting games (RPS, Hangman), store payout in bet_amount for web display
-    const betAmount = (gameType === 'rps' || gameType === 'hangman') ? payout : 0;
+    // For web history display: payout = bet + xpGained (so web can calculate XP as payout - bet)
+    // RPS: bet=0, payout=xpGained (risk-free, only gain on win)
+    // Hangman/Blackjack: bet=actual bet, payout=bet+xpGained on win, 0 on loss
+    let payout = 0;
+    if (state === 'won' || state === 'blackjack') {
+        payout = betAmount + xpGained;
+    } else if (state === 'push') {
+        payout = betAmount; // Return bet
+    }
+    // Lost = payout stays 0
     
     await pool.execute(
         `INSERT INTO game_sessions (discord_id, game_type, bet_amount, state, payout, ended_at) 
