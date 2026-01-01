@@ -669,6 +669,14 @@ async function handleClassButton(interaction) {
         const existingSkill = await db.hasSkill(userId, skillId);
         const currentLevel = existingSkill?.skill_level || 0;
         
+        // CLASS-LOCKING: Only allow DEFAULT skills for everyone, or class-specific skills if owned
+        if (selectedClass !== 'DEFAULT') {
+            const ownsClass = user[`owns_${selectedClass.toLowerCase()}`];
+            if (!ownsClass) {
+                return interaction.reply({ embeds: [ui.error('Class Required', `You must own the ${selectedClass} class to unlock this skill!`)], flags: MessageFlags.Ephemeral });
+            }
+        }
+        
         // Check requirements
         if (skill.requires) {
             const hasReq = await db.hasSkill(userId, skill.requires);
