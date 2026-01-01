@@ -24,6 +24,7 @@ const db = require('../database/db');
 const deck = require('../utils/games/deck');
 const xpService = require('../utils/games/xpTransaction');
 const sessionManager = require('../utils/games/sessionManager');
+const { calculateFinalXP } = require('../utils/gameLogic');
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  CONFIG
@@ -735,8 +736,29 @@ async function resolveGame(interaction, session, userId, isDoubled = false) {
             break;
     }
     
+    // Apply class/skill bonuses to NET WINNINGS (not the bet return)
     if (payout > 0) {
-        await xpService.processXPTransaction(userId, payout, xpSource, session.id);
+        const netWinnings = payout - totalBet; // Profit only
+        if (netWinnings > 0) {
+            // Get user data for bonus calculation
+            const user = await db.getUser(userId);
+            const userSkills = await db.getUserSkills(userId);
+            const { finalXP, bonusInfo, userUpdates } = calculateFinalXP(user, userSkills, netWinnings);
+            
+            // Return original bet + boosted winnings
+            const boostedPayout = totalBet + finalXP;
+            await xpService.processXPTransaction(userId, boostedPayout, xpSource, session.id);
+            
+            // Update class-specific counters
+            if (Object.keys(userUpdates).length > 0) {
+                await db.updateUser(userId, userUpdates);
+            }
+            
+            payout = boostedPayout; // For display
+        } else {
+            // Push - just return bet, no bonuses
+            await xpService.processXPTransaction(userId, payout, xpSource, session.id);
+        }
     }
     
     // Use MAPPED state for database
@@ -755,7 +777,7 @@ async function resolveGame(interaction, session, userId, isDoubled = false) {
 //  ✊ ROCK PAPER SCISSORS
 // ═══════════════════════════════════════════════════════════════════════════════
 
-const RPS_REWARD = 15;
+const RPS_REWARD = 10;
 const RPS_CHOICES = ['rock', 'paper', 'scissors'];
 const RPS_EMOJI = { rock: '🪨', paper: '📄', scissors: '✂️' };
 const RPS_BEATS = { rock: 'scissors', paper: 'rock', scissors: 'paper' };
@@ -808,9 +830,21 @@ async function handleRPS(interaction, playerChoice) {
     }
     
     let xpGained = 0;
+    let bonusDetails = '';
     if (outcome === 'win') {
-        xpGained = RPS_REWARD;
-        await xpService.processXPTransaction(userId, RPS_REWARD, 'game_reward', null);
+        // Apply class/skill bonuses to RPS reward
+        const user = await db.getUser(userId);
+        const userSkills = await db.getUserSkills(userId);
+        const { finalXP, bonusInfo, userUpdates } = calculateFinalXP(user, userSkills, RPS_REWARD);
+        
+        xpGained = finalXP;
+        bonusDetails = bonusInfo?.details || '';
+        await xpService.processXPTransaction(userId, finalXP, 'game_reward', null);
+        
+        // Update class-specific counters
+        if (Object.keys(userUpdates).length > 0) {
+            await db.updateUser(userId, userUpdates);
+        }
     }
     
     await db.recordGameResult(userId, 'rps', gameState, xpGained);
@@ -1011,13 +1045,25 @@ async function handleHangmanGuess(interaction, letter) {
     }
     
     if (won) {
-        const xpGained = getHangmanReward(game.lives);
-        await xpService.processXPTransaction(userId, xpGained, 'game_reward', null);
+        const baseXP = getHangmanReward(game.lives);
+        
+        // Apply class/skill bonuses
+        const user = await db.getUser(userId);
+        const userSkills = await db.getUserSkills(userId);
+        const { finalXP, bonusInfo, userUpdates } = calculateFinalXP(user, userSkills, baseXP);
+        
+        await xpService.processXPTransaction(userId, finalXP, 'game_reward', null);
+        
+        // Update class-specific counters
+        if (Object.keys(userUpdates).length > 0) {
+            await db.updateUser(userId, userUpdates);
+        }
+        
         const newBalance = await xpService.getBalance(userId);
         hangmanGames.delete(userId);
-        await db.recordGameResult(userId, 'hangman', 'won', xpGained);
+        await db.recordGameResult(userId, 'hangman', 'won', finalXP);
         return interaction.editReply({
-            embeds: [hangmanWinEmbed(game, xpGained, newBalance)],
+            embeds: [hangmanWinEmbed(game, finalXP, newBalance)],
             components: hangmanEndButtons()
         });
     }
