@@ -847,7 +847,7 @@ async function handleRPS(interaction, playerChoice) {
         }
     }
     
-    await db.recordGameResult(userId, 'rps', gameState, xpGained);
+    await db.recordGameResult(userId, 'rps', gameState, xpGained, 0); // RPS is risk-free, no bet
     const newBalance = await xpService.getBalance(userId);
     
     await interaction.editReply({
@@ -1037,7 +1037,7 @@ async function handleHangmanGuess(interaction, letter) {
     if (game.lives === 0) {
         hangmanGames.delete(userId);
         const newBalance = await xpService.getBalance(userId);
-        await db.recordGameResult(userId, 'hangman', 'lost', 0);
+        await db.recordGameResult(userId, 'hangman', 'lost', 0, 0); // Free to play
         return interaction.editReply({
             embeds: [hangmanLoseEmbed(game, newBalance)],
             components: hangmanEndButtons()
@@ -1061,7 +1061,7 @@ async function handleHangmanGuess(interaction, letter) {
         
         const newBalance = await xpService.getBalance(userId);
         hangmanGames.delete(userId);
-        await db.recordGameResult(userId, 'hangman', 'won', finalXP);
+        await db.recordGameResult(userId, 'hangman', 'won', finalXP, 0); // Free to play
         return interaction.editReply({
             embeds: [hangmanWinEmbed(game, finalXP, newBalance)],
             components: hangmanEndButtons()
