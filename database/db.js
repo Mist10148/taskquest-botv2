@@ -190,41 +190,31 @@ async function getUserStats(id) {
         FROM items i JOIN lists l ON i.list_id = l.id WHERE l.discord_id = ?
     `, [id]);
     
-    // Get achievement count - user's schema uses 'achievements' table with discord_id
+    // Get achievement count
     const [achs] = await p.execute('SELECT COUNT(*) as count FROM achievements WHERE discord_id = ?', [id]);
     
-    // Game statistics - count ALL completed games accurately
-    let gameStats = { played: 0, won: 0, lost: 0, draws: 0, xpEarned: 0, xpLost: 0 };
+    // Game statistics
+    let gameStats = { played: 0, won: 0, lost: 0, draws: 0 };
     try {
         const [games] = await p.execute(`
             SELECT 
                 COUNT(*) as played,
-                SUM(CASE WHEN state IN ('won', 'blackjack') THEN 1 ELSE 0 END) as won,
-                SUM(CASE WHEN state IN ('lost', 'expired', 'bust') THEN 1 ELSE 0 END) as lost,
-                SUM(CASE WHEN state = 'push' THEN 1 ELSE 0 END) as draws
+                COALESCE(SUM(CASE WHEN state IN ('won', 'blackjack') THEN 1 ELSE 0 END), 0) as won,
+                COALESCE(SUM(CASE WHEN state IN ('lost', 'expired', 'cancelled', 'surrender') THEN 1 ELSE 0 END), 0) as lost,
+                COALESCE(SUM(CASE WHEN state = 'push' THEN 1 ELSE 0 END), 0) as draws
             FROM game_sessions 
             WHERE discord_id = ? 
-            AND state NOT IN ('active')
+            AND state != 'active'
         `, [id]);
         
-        // XP tracking from transactions
-        const [xpStats] = await p.execute(`
-            SELECT 
-                COALESCE(SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END), 0) as earned,
-                COALESCE(SUM(CASE WHEN amount < 0 THEN -amount ELSE 0 END), 0) as lost
-            FROM xp_transactions 
-            WHERE discord_id = ? 
-            AND (source LIKE '%game%' OR source LIKE '%blackjack%' OR source LIKE '%rps%' OR source LIKE '%hangman%')
-        `, [id]);
-        
-        gameStats = {
-            played: parseInt(games[0]?.played) || 0,
-            won: parseInt(games[0]?.won) || 0,
-            lost: parseInt(games[0]?.lost) || 0,
-            draws: parseInt(games[0]?.draws) || 0,
-            xpEarned: parseInt(xpStats[0]?.earned) || 0,
-            xpLost: parseInt(xpStats[0]?.lost) || 0
-        };
+        if (games && games[0]) {
+            gameStats = {
+                played: Number(games[0].played) || 0,
+                won: Number(games[0].won) || 0,
+                lost: Number(games[0].lost) || 0,
+                draws: Number(games[0].draws) || 0
+            };
+        }
     } catch (e) { 
         console.error('Game stats query error:', e.message);
     }
