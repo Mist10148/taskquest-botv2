@@ -181,19 +181,21 @@ async function getUserStats(id) {
     const user = await getUser(id);
     if (!user) return null;
     
+    // Get list count
     const [lists] = await p.execute('SELECT COUNT(*) as total FROM lists WHERE discord_id = ?', [id]);
+    
+    // Get item stats
     const [items] = await p.execute(`
         SELECT COUNT(i.id) as total, SUM(CASE WHEN i.completed THEN 1 ELSE 0 END) as completed
         FROM items i JOIN lists l ON i.list_id = l.id WHERE l.discord_id = ?
     `, [id]);
-    const [achs] = await p.execute('SELECT COUNT(*) as count FROM achievements WHERE discord_id = ?', [id]);
+    
+    // Get achievement count - from user_achievements, not achievements!
+    const [achs] = await p.execute('SELECT COUNT(*) as count FROM user_achievements WHERE discord_id = ?', [id]);
     
     // Game statistics - count ALL completed games accurately
-    // States: won, lost, blackjack (natural 21), push (tie)
     let gameStats = { played: 0, won: 0, lost: 0, draws: 0, xpEarned: 0, xpLost: 0 };
     try {
-        // Count all finished games (won, lost, blackjack, push)
-        // Also include expired sessions as they count as losses
         const [games] = await p.execute(`
             SELECT 
                 COUNT(*) as played,
@@ -224,7 +226,6 @@ async function getUserStats(id) {
             xpLost: parseInt(xpStats[0]?.lost) || 0
         };
     } catch (e) { 
-        // Tables might not exist - continue without game stats
         console.error('Game stats query error:', e.message);
     }
     
