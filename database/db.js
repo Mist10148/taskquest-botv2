@@ -190,8 +190,8 @@ async function getUserStats(id) {
         FROM items i JOIN lists l ON i.list_id = l.id WHERE l.discord_id = ?
     `, [id]);
     
-    // Get achievement count - from user_achievements, not achievements!
-    const [achs] = await p.execute('SELECT COUNT(*) as count FROM user_achievements WHERE discord_id = ?', [id]);
+    // Get achievement count - user's schema uses 'achievements' table with discord_id
+    const [achs] = await p.execute('SELECT COUNT(*) as count FROM achievements WHERE discord_id = ?', [id]);
     
     // Game statistics - count ALL completed games accurately
     let gameStats = { played: 0, won: 0, lost: 0, draws: 0, xpEarned: 0, xpLost: 0 };
