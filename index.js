@@ -211,7 +211,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
             log('🔘', 'BTN', `${interaction.user.tag} ${id}`);
             
             // List command buttons
-            if (['sort_az', 'sort_date', 'sort_pri', 'create', 'back', 'filter_cat'].includes(id) ||
+            if (['sort_az', 'sort_date', 'sort_pri', 'create', 'back', 'filter_cat', 'filter_all', 'filter_current', 'filter_expired', 'filter_completed'].includes(id) ||
                 id.startsWith('sort_') || id.startsWith('search_') || id.startsWith('refresh_') ||
                 id.startsWith('edit_') || id.startsWith('view_') ||
                 id.startsWith('item_') || id.startsWith('list_') ||
@@ -258,7 +258,13 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 return;
             }
             
-            await interaction.reply({ content: '❌ Button expired', flags: MessageFlags.Ephemeral });
+            // Unknown button - try to respond, but catch if interaction expired
+            try {
+                await interaction.reply({ content: '❌ Button expired or unknown', flags: MessageFlags.Ephemeral });
+            } catch (e) {
+                // Interaction already expired, can't respond
+                console.log('⚠️ Could not respond to expired interaction:', id);
+            }
             return;
         }
         
