@@ -343,12 +343,7 @@ function viewButtons(listId) {
             new ButtonBuilder().setCustomId(`sort_az_${listId}`).setLabel('A→Z').setStyle(ButtonStyle.Secondary),
             new ButtonBuilder().setCustomId(`sort_za_${listId}`).setLabel('Z→A').setStyle(ButtonStyle.Secondary),
             new ButtonBuilder().setCustomId(`sort_pri_${listId}`).setLabel('Priority').setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder().setCustomId(`search_${listId}`).setEmoji('🔍').setStyle(ButtonStyle.Secondary)
-        ),
-        new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId(`sort_current_${listId}`).setLabel('Current').setEmoji('📝').setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder().setCustomId(`sort_expired_${listId}`).setLabel('Expired').setEmoji('⏰').setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder().setCustomId(`sort_completed_${listId}`).setLabel('Completed').setEmoji('✅').setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder().setCustomId(`search_${listId}`).setEmoji('🔍').setStyle(ButtonStyle.Secondary),
             new ButtonBuilder().setCustomId(`refresh_${listId}`).setEmoji('🔄').setStyle(ButtonStyle.Secondary)
         ),
         new ActionRowBuilder().addComponents(
