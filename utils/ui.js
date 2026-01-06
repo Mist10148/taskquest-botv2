@@ -379,13 +379,21 @@ function editButtons(listId) {
 }
 
 function overviewButtons() {
-    return new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId('sort_az').setLabel('A→Z').setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder().setCustomId('sort_date').setLabel('Date').setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder().setCustomId('sort_pri').setLabel('Priority').setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder().setCustomId('filter_cat').setLabel('Filter').setEmoji('🏷️').setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder().setCustomId('create').setLabel('Create').setEmoji('➕').setStyle(ButtonStyle.Success)
-    );
+    return [
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId('sort_az').setLabel('A→Z').setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder().setCustomId('sort_date').setLabel('Date').setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder().setCustomId('sort_pri').setLabel('Priority').setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder().setCustomId('filter_cat').setLabel('Filter').setEmoji('🏷️').setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder().setCustomId('create').setLabel('Create').setEmoji('➕').setStyle(ButtonStyle.Success)
+        ),
+        new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId('filter_all').setLabel('All').setEmoji('📋').setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder().setCustomId('filter_current').setLabel('Current').setEmoji('📝').setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder().setCustomId('filter_expired').setLabel('Expired').setEmoji('⏰').setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder().setCustomId('filter_completed').setLabel('Completed').setEmoji('✅').setStyle(ButtonStyle.Secondary)
+        )
+    ];
 }
 
 // Category filter select menu for list filtering
