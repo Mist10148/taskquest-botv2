@@ -40,7 +40,7 @@ async function execute(interaction) {
         const components = [];
         const sel = ui.listSelect(lists);
         if (sel) components.push(sel);
-        components.push(ui.overviewButtons());
+        components.push(...ui.overviewButtons());
         await interaction.reply({ embeds: [ui.listsOverviewEmbed(lists)], components });
     }
 }
@@ -60,7 +60,7 @@ async function handleButton(interaction) {
         const components = [];
         const sel = ui.listSelect(lists);
         if (sel) components.push(sel);
-        components.push(ui.overviewButtons());
+        components.push(...ui.overviewButtons());
         return interaction.update({ embeds: [ui.listsOverviewEmbed(lists, sort)], components });
     }
     
@@ -71,10 +71,67 @@ async function handleButton(interaction) {
         components.push(ui.categoryFilterSelect());
         const sel = ui.listSelect(lists);
         if (sel) components.push(sel);
-        components.push(ui.overviewButtons());
+        components.push(...ui.overviewButtons());
         return interaction.update({ embeds: [ui.listsOverviewEmbed(lists, 'category')], components });
     }
-    
+
+    // Filter: All lists
+    if (id === 'filter_all') {
+        const lists = await db.getLists(userId);
+        const components = [];
+        const sel = ui.listSelect(lists);
+        if (sel) components.push(sel);
+        components.push(...ui.overviewButtons());
+        return interaction.update({ embeds: [ui.listsOverviewEmbed(lists, '', 'All')], components });
+    }
+
+    // Filter: Current (incomplete, not expired)
+    if (id === 'filter_current') {
+        let lists = await db.getLists(userId);
+        const now = new Date();
+        lists = lists.filter(list => {
+            const isExpired = list.deadline && new Date(list.deadline) < now;
+            return !isExpired;
+        });
+        const components = [];
+        const sel = ui.listSelect(lists);
+        if (sel) components.push(sel);
+        components.push(...ui.overviewButtons());
+        return interaction.update({ embeds: [ui.listsOverviewEmbed(lists, '', 'Current')], components });
+    }
+
+    // Filter: Expired (past deadline)
+    if (id === 'filter_expired') {
+        let lists = await db.getLists(userId);
+        const now = new Date();
+        lists = lists.filter(list => {
+            return list.deadline && new Date(list.deadline) < now;
+        });
+        const components = [];
+        const sel = ui.listSelect(lists);
+        if (sel) components.push(sel);
+        components.push(...ui.overviewButtons());
+        return interaction.update({ embeds: [ui.listsOverviewEmbed(lists, '', 'Expired')], components });
+    }
+
+    // Filter: Completed (all items done)
+    if (id === 'filter_completed') {
+        let lists = await db.getLists(userId);
+        // Get list stats to check completion
+        const listsWithStats = await Promise.all(lists.map(async (list) => {
+            const items = await db.getItems(list.id);
+            const total = items.length;
+            const completed = items.filter(i => i.completed).length;
+            return { ...list, isComplete: total > 0 && total === completed };
+        }));
+        lists = listsWithStats.filter(list => list.isComplete);
+        const components = [];
+        const sel = ui.listSelect(lists);
+        if (sel) components.push(sel);
+        components.push(...ui.overviewButtons());
+        return interaction.update({ embeds: [ui.listsOverviewEmbed(lists, '', 'Completed')], components });
+    }
+
     if (id === 'create') {
         return interaction.showModal(ui.listModal());
     }
@@ -84,7 +141,7 @@ async function handleButton(interaction) {
         const components = [];
         const sel = ui.listSelect(lists);
         if (sel) components.push(sel);
-        components.push(ui.overviewButtons());
+        components.push(...ui.overviewButtons());
         return interaction.update({ embeds: [ui.listsOverviewEmbed(lists)], components });
     }
     
@@ -329,7 +386,7 @@ async function handleSelectMenu(interaction) {
         components.push(ui.categoryFilterSelect());
         const sel = ui.listSelect(lists);
         if (sel) components.push(sel);
-        components.push(ui.overviewButtons());
+        components.push(...ui.overviewButtons());
         
         const filterLabel = val === 'ALL' ? 'All Categories' : val === 'NONE' ? 'Uncategorized' : val;
         return interaction.update({ 
@@ -448,7 +505,7 @@ async function handleSelectMenu(interaction) {
                 
                 user = await db.getUser(userId);
                 const achs = await db.getAchievements(userId);
-                const newAchs = checkAchievements(user, achs.map(a => a.achievement_key));
+                const newAchs = checkAchievements(user, achs.map(a => a.achievement_key)) || [];
                 for (const a of newAchs) await db.unlockAchievement(userId, a.key);
                 
                 // Private XP notification (ephemeral)
@@ -514,9 +571,9 @@ async function handleModal(interaction) {
             
             user = await db.getUser(userId);
             const achs = await db.getAchievements(userId);
-            const newAchs = checkAchievements(user, achs.map(a => a.achievement_key));
+            const newAchs = checkAchievements(user, achs.map(a => a.achievement_key)) || [];
             for (const a of newAchs) await db.unlockAchievement(userId, a.key);
-            
+
             await interaction.reply({ embeds: [ui.success('Created!', `**${name}**`)], components: [ui.catSelect(`cat_${listId}`), ui.priSelect(`pri_${listId}`)], flags: MessageFlags.Ephemeral });
             if (xpResult.xpGained) await interaction.followUp({ embeds: [ui.xpEmbed(xpResult.xpGained, bonusInfo, xpResult.leveledUp, xpResult.newLevel)], flags: MessageFlags.Ephemeral });
             for (const a of newAchs) await interaction.followUp({ embeds: [ui.achievementUnlockEmbed(a)], flags: MessageFlags.Ephemeral });
@@ -559,7 +616,7 @@ async function handleModal(interaction) {
             
             user = await db.getUser(userId);
             const achs = await db.getAchievements(userId);
-            const newAchs = checkAchievements(user, achs.map(a => a.achievement_key));
+            const newAchs = checkAchievements(user, achs.map(a => a.achievement_key)) || [];
             for (const a of newAchs) await db.unlockAchievement(userId, a.key);
             
             const list = await db.getListById(listId);
