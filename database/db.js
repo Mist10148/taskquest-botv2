@@ -150,6 +150,16 @@ async function initializeDatabase() {
         // Column might already exist
     }
 
+    // Add updated_at column to items table if it doesn't exist (migration)
+    try {
+        await p.execute(`
+            ALTER TABLE items
+            ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        `);
+    } catch (e) {
+        // Column might already exist
+    }
+
     console.log('✅ Database tables ready');
 }
 
