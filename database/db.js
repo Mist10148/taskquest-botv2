@@ -552,39 +552,62 @@ async function recordGameResult(discordId, gameType, state, xpGained = 0, betAmo
 async function cleanupOldLists() {
     try {
         const pool = await getPool();
+        let totalDeleted = 0;
 
-        // Delete completed lists older than 5 days for users with auto-delete enabled
-        const [completedResult] = await pool.execute(`
-            DELETE l FROM lists l
-            INNER JOIN (
-                SELECT l2.id
-                FROM lists l2
-                INNER JOIN users u ON l2.discord_id = u.discord_id
-                LEFT JOIN items li ON l2.id = li.list_id
-                WHERE u.auto_delete_old_lists = TRUE
-                GROUP BY l2.id
-                HAVING
-                    COUNT(li.id) > 0 AND
-                    COUNT(li.id) = SUM(CASE WHEN li.completed THEN 1 ELSE 0 END) AND
-                    DATEDIFF(NOW(), MAX(li.updated_at)) >= 5
-            ) AS completed_lists ON l.id = completed_lists.id
-        `);
-
-        // Delete expired lists (past deadline and incomplete) older than 5 days for users with auto-delete enabled
-        const [expiredResult] = await pool.execute(`
-            DELETE l FROM lists l
+        // Find and delete completed lists older than 5 days (TiDB-compatible approach)
+        const [completedLists] = await pool.execute(`
+            SELECT l.id, l.discord_id
+            FROM lists l
             INNER JOIN users u ON l.discord_id = u.discord_id
-            LEFT JOIN items li ON l.id = li.list_id
             WHERE u.auto_delete_old_lists = TRUE
-                AND l.deadline IS NOT NULL
-                AND l.deadline < DATE_SUB(NOW(), INTERVAL 5 DAY)
-            GROUP BY l.id
-            HAVING COUNT(li.id) = 0 OR COUNT(li.id) > SUM(CASE WHEN li.completed THEN 1 ELSE 0 END)
         `);
 
-        const totalDeleted = completedResult.affectedRows + expiredResult.affectedRows;
+        for (const list of completedLists) {
+            const [items] = await pool.execute(
+                'SELECT id, completed, updated_at FROM items WHERE list_id = ?',
+                [list.id]
+            );
+
+            // Check if list is fully completed and old enough
+            if (items.length > 0) {
+                const allCompleted = items.every(item => item.completed);
+                if (allCompleted) {
+                    const oldestUpdate = items.reduce((oldest, item) => {
+                        const itemDate = new Date(item.updated_at);
+                        return itemDate < oldest ? itemDate : oldest;
+                    }, new Date());
+
+                    const daysSinceUpdate = Math.floor((Date.now() - oldestUpdate.getTime()) / (1000 * 60 * 60 * 24));
+
+                    if (daysSinceUpdate >= 5) {
+                        await pool.execute('DELETE FROM lists WHERE id = ?', [list.id]);
+                        totalDeleted++;
+                    }
+                }
+            }
+
+            // Check if list is expired and old enough
+            const [listData] = await pool.execute(
+                'SELECT deadline FROM lists WHERE id = ?',
+                [list.id]
+            );
+
+            if (listData[0]?.deadline) {
+                const deadline = new Date(listData[0].deadline);
+                const daysSinceDeadline = Math.floor((Date.now() - deadline.getTime()) / (1000 * 60 * 60 * 24));
+
+                if (daysSinceDeadline >= 5) {
+                    const hasIncomplete = items.length === 0 || items.some(item => !item.completed);
+                    if (hasIncomplete) {
+                        await pool.execute('DELETE FROM lists WHERE id = ?', [list.id]);
+                        totalDeleted++;
+                    }
+                }
+            }
+        }
+
         if (totalDeleted > 0) {
-            console.log(`🗑️  Auto-deleted ${totalDeleted} old lists (${completedResult.affectedRows} completed, ${expiredResult.affectedRows} expired)`);
+            console.log(`🗑️  Auto-deleted ${totalDeleted} old lists`);
         }
 
         return totalDeleted;
