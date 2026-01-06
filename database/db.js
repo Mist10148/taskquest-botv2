@@ -60,6 +60,7 @@ async function initializeDatabase() {
             player_class ENUM('DEFAULT','HERO','GAMBLER','ASSASSIN','WIZARD','ARCHER','TANK') DEFAULT 'DEFAULT',
             gamification_enabled BOOLEAN DEFAULT TRUE,
             automation_enabled BOOLEAN DEFAULT TRUE,
+            auto_delete_old_lists BOOLEAN DEFAULT TRUE,
             streak_count INT DEFAULT 0,
             last_active_day DATE DEFAULT NULL,
             last_daily_claim DATETIME DEFAULT NULL,
@@ -138,7 +139,17 @@ async function initializeDatabase() {
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )`)
     ]);
-    
+
+    // Add auto_delete_old_lists column if it doesn't exist (migration)
+    try {
+        await p.execute(`
+            ALTER TABLE users
+            ADD COLUMN IF NOT EXISTS auto_delete_old_lists BOOLEAN DEFAULT TRUE
+        `);
+    } catch (e) {
+        // Column might already exist
+    }
+
     console.log('✅ Database tables ready');
 }
 
@@ -524,6 +535,50 @@ async function recordGameResult(discordId, gameType, state, xpGained = 0, betAmo
     );
 }
 
+/**
+ * Auto-delete lists that are expired or completed for 5+ days
+ * Only deletes for users who have auto_delete_old_lists enabled
+ */
+async function cleanupOldLists() {
+    const pool = await getPool();
+
+    // Delete completed lists older than 5 days for users with auto-delete enabled
+    const [completedResult] = await pool.execute(`
+        DELETE l FROM lists l
+        INNER JOIN (
+            SELECT l2.id
+            FROM lists l2
+            INNER JOIN users u ON l2.discord_id = u.discord_id
+            LEFT JOIN list_items li ON l2.id = li.list_id
+            WHERE u.auto_delete_old_lists = TRUE
+            GROUP BY l2.id
+            HAVING
+                COUNT(li.id) > 0 AND
+                COUNT(li.id) = SUM(CASE WHEN li.completed THEN 1 ELSE 0 END) AND
+                DATEDIFF(NOW(), MAX(li.updated_at)) >= 5
+        ) AS completed_lists ON l.id = completed_lists.id
+    `);
+
+    // Delete expired lists (past deadline and incomplete) older than 5 days for users with auto-delete enabled
+    const [expiredResult] = await pool.execute(`
+        DELETE l FROM lists l
+        INNER JOIN users u ON l.discord_id = u.discord_id
+        LEFT JOIN list_items li ON l.id = li.list_id
+        WHERE u.auto_delete_old_lists = TRUE
+            AND l.deadline IS NOT NULL
+            AND l.deadline < DATE_SUB(NOW(), INTERVAL 5 DAY)
+        GROUP BY l.id
+        HAVING COUNT(li.id) = 0 OR COUNT(li.id) > SUM(CASE WHEN li.completed THEN 1 ELSE 0 END)
+    `);
+
+    const totalDeleted = completedResult.affectedRows + expiredResult.affectedRows;
+    if (totalDeleted > 0) {
+        console.log(`🗑️  Auto-deleted ${totalDeleted} old lists (${completedResult.affectedRows} completed, ${expiredResult.affectedRows} expired)`);
+    }
+
+    return totalDeleted;
+}
+
 module.exports = {
     getPool, closePool, initializeDatabase,
     getUser, createUser, getOrCreateUser, updateUser, getLeaderboard, getUserStats, getGameStats,
@@ -532,5 +587,5 @@ module.exports = {
     addItem, getItems, getItemById, updateItem, deleteItem, toggleItemComplete, swapItemPositions,
     getAchievements, unlockAchievement,
     getUserSkills, hasSkill, unlockSkill, upgradeSkill, addSkillPoints,
-    recordGameResult
+    recordGameResult, cleanupOldLists
 };
