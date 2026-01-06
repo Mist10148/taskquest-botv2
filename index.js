@@ -128,7 +128,26 @@ client.once(Events.ClientReady, async (c) => {
     // Start deadline scheduler
     setTimeout(checkDeadlines, 5000);
     setInterval(checkDeadlines, 60 * 60 * 1000); // Every hour
-    
+
+    // Auto-delete old lists cleanup - every 24 hours
+    setTimeout(async () => {
+        try {
+            const deleted = await db.cleanupOldLists();
+            if (deleted > 0) log('🗑️', 'AUTO-DELETE', `Cleaned up ${deleted} old lists`);
+        } catch (e) {
+            log('❌', 'AUTO-DELETE', e.message);
+        }
+    }, 10000); // Run 10 seconds after startup
+
+    setInterval(async () => {
+        try {
+            const deleted = await db.cleanupOldLists();
+            if (deleted > 0) log('🗑️', 'AUTO-DELETE', `Cleaned up ${deleted} old lists`);
+        } catch (e) {
+            log('❌', 'AUTO-DELETE', e.message);
+        }
+    }, 24 * 60 * 60 * 1000); // Every 24 hours
+
     // Game session cleanup - every 15 minutes
     setInterval(async () => {
         const expired = await sessionManager.expireOldSessions();
