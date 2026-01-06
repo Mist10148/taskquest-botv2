@@ -55,8 +55,8 @@ async function initializeDatabase() {
     await Promise.all([
         p.execute(`CREATE TABLE IF NOT EXISTS users (
             discord_id VARCHAR(32) PRIMARY KEY,
-            player_xp INT DEFAULT 0,
-            player_level INT DEFAULT 1,
+            player_xp BIGINT DEFAULT 0,
+            player_level BIGINT DEFAULT 1,
             player_class ENUM('DEFAULT','HERO','GAMBLER','ASSASSIN','WIZARD','ARCHER','TANK') DEFAULT 'DEFAULT',
             gamification_enabled BOOLEAN DEFAULT TRUE,
             automation_enabled BOOLEAN DEFAULT TRUE,
@@ -131,10 +131,10 @@ async function initializeDatabase() {
         p.execute(`CREATE TABLE IF NOT EXISTS xp_transactions (
             id INT AUTO_INCREMENT PRIMARY KEY,
             discord_id VARCHAR(32) NOT NULL,
-            amount INT NOT NULL,
+            amount BIGINT NOT NULL,
             source VARCHAR(50) NOT NULL,
-            balance_before INT DEFAULT 0,
-            balance_after INT DEFAULT 0,
+            balance_before BIGINT DEFAULT 0,
+            balance_after BIGINT DEFAULT 0,
             reference_id INT DEFAULT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )`)
@@ -158,6 +158,19 @@ async function initializeDatabase() {
         `);
     } catch (e) {
         // Column might already exist
+    }
+
+    // Upgrade player_xp and player_level to BIGINT (supports values up to 9,223,372,036,854,775,807)
+    try {
+        await p.execute(`ALTER TABLE users MODIFY COLUMN player_xp BIGINT DEFAULT 0`);
+        await p.execute(`ALTER TABLE users MODIFY COLUMN player_level BIGINT DEFAULT 1`);
+        await p.execute(`ALTER TABLE xp_transactions MODIFY COLUMN amount BIGINT NOT NULL`);
+        await p.execute(`ALTER TABLE xp_transactions MODIFY COLUMN balance_before BIGINT DEFAULT 0`);
+        await p.execute(`ALTER TABLE xp_transactions MODIFY COLUMN balance_after BIGINT DEFAULT 0`);
+        console.log('✅ Upgraded XP columns to BIGINT');
+    } catch (e) {
+        // Migration might have already run
+        console.log('Note: XP BIGINT migration skipped (may already be applied)');
     }
 
     console.log('✅ Database tables ready');
