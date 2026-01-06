@@ -240,14 +240,14 @@ const profileData = new SlashCommandBuilder()
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function progressBar(current, max, length = 20) {
-    if (max === 0) return { bar: '░'.repeat(length), percent: 0 };
-    
+    if (max === 0) return { bar: '▱'.repeat(length), percent: 0 };
+
     const percent = Math.min(100, Math.round((current / max) * 100));
     const filled = Math.round((percent / 100) * length);
-    
-    const filledPart = '▰'.repeat(Math.min(filled, length));
+
+    const filledPart = '▰'.repeat(Math.max(0, Math.min(filled, length)));
     const emptyPart = '▱'.repeat(Math.max(0, length - filled));
-    
+
     return {
         bar: filledPart + emptyPart,
         percent: percent

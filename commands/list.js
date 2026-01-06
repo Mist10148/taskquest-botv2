@@ -122,7 +122,40 @@ async function handleButton(interaction) {
         items.sort((a, b) => (a.completed ? 1 : 0) - (b.completed ? 1 : 0));
         return interaction.update({ embeds: [ui.listViewEmbed(list, items, 'view')], components: ui.viewButtons(listId) });
     }
-    
+
+    // Sort by current (incomplete and not expired)
+    if (id.startsWith('sort_current_')) {
+        const listId = parseInt(id.replace('sort_current_', ''));
+        const list = await db.getListById(listId);
+        if (!list || list.discord_id !== userId) return interaction.reply({ embeds: [ui.error('Access Denied')], flags: MessageFlags.Ephemeral });
+        let items = await db.getItems(listId);
+        items = items.filter(item => !item.completed);
+        return interaction.update({ embeds: [ui.listViewEmbed(list, items, 'view', 'Current tasks')], components: ui.viewButtons(listId) });
+    }
+
+    // Sort by expired (has deadline and past due, not completed)
+    if (id.startsWith('sort_expired_')) {
+        const listId = parseInt(id.replace('sort_expired_', ''));
+        const list = await db.getListById(listId);
+        if (!list || list.discord_id !== userId) return interaction.reply({ embeds: [ui.error('Access Denied')], flags: MessageFlags.Ephemeral });
+        const items = await db.getItems(listId);
+        const now = new Date();
+        // For list-level deadline: check if list.deadline exists and is expired
+        const listExpired = list.deadline && new Date(list.deadline) < now;
+        const filteredItems = listExpired ? items.filter(item => !item.completed) : [];
+        return interaction.update({ embeds: [ui.listViewEmbed(list, filteredItems, 'view', listExpired ? 'Expired tasks' : 'No expired items')], components: ui.viewButtons(listId) });
+    }
+
+    // Sort by completed
+    if (id.startsWith('sort_completed_')) {
+        const listId = parseInt(id.replace('sort_completed_', ''));
+        const list = await db.getListById(listId);
+        if (!list || list.discord_id !== userId) return interaction.reply({ embeds: [ui.error('Access Denied')], flags: MessageFlags.Ephemeral });
+        let items = await db.getItems(listId);
+        items = items.filter(item => item.completed);
+        return interaction.update({ embeds: [ui.listViewEmbed(list, items, 'view', 'Completed tasks')], components: ui.viewButtons(listId) });
+    }
+
     // Search (opens modal)
     if (id.startsWith('search_')) {
         return interaction.showModal(ui.searchModal());
