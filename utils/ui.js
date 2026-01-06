@@ -45,9 +45,9 @@ const CATEGORY_EMOJI = { School: '📚', Work: '💼', Home: '🏠', Personal: '
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function bar(cur, max, len = 10) {
-    if (max === 0) return '░'.repeat(len);
+    if (max === 0) return '▱'.repeat(len);
     const f = Math.round((cur / max) * len);
-    return '█'.repeat(Math.min(f, len)) + '░'.repeat(Math.max(0, len - f));
+    return '▰'.repeat(Math.min(f, len)) + '▱'.repeat(Math.max(0, len - f));
 }
 
 function smoothBar(current, max, length = 12) {
