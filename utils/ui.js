@@ -82,11 +82,11 @@ function xpBar(current, max, length = 15) {
 //  📋 LIST EMBEDS (Clean & Professional)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function listViewEmbed(list, items, mode = 'view') {
+function listViewEmbed(list, items, mode = 'view', filterLabel = null) {
     const done = items.filter(i => i.completed).length;
     const total = items.length;
     const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-    
+
     // Color based on priority (strict system)
     let embedColor;
     if (mode === 'edit') {
@@ -96,13 +96,14 @@ function listViewEmbed(list, items, mode = 'view') {
     } else {
         embedColor = COLORS.muted; // Gray for no priority (optional)
     }
-    
+
     const embed = new EmbedBuilder()
         .setColor(embedColor);
-    
+
     // Title with category emoji if present
     const catEmoji = list.category ? (CATEGORY_EMOJI[list.category] || '📁') : '📋';
-    embed.setTitle(`${catEmoji} ${list.name}`);
+    const titleSuffix = filterLabel ? ` • ${filterLabel}` : '';
+    embed.setTitle(`${catEmoji} ${list.name}${titleSuffix}`);
     
     // Build clean description
     let desc = '';
@@ -345,8 +346,13 @@ function viewButtons(listId) {
             new ButtonBuilder().setCustomId(`search_${listId}`).setEmoji('🔍').setStyle(ButtonStyle.Secondary)
         ),
         new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId(`sort_current_${listId}`).setLabel('Current').setEmoji('📝').setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder().setCustomId(`sort_expired_${listId}`).setLabel('Expired').setEmoji('⏰').setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder().setCustomId(`sort_completed_${listId}`).setLabel('Completed').setEmoji('✅').setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder().setCustomId(`refresh_${listId}`).setEmoji('🔄').setStyle(ButtonStyle.Secondary)
+        ),
+        new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId(`edit_${listId}`).setLabel('Edit List').setEmoji('✏️').setStyle(ButtonStyle.Primary),
-            new ButtonBuilder().setCustomId(`refresh_${listId}`).setEmoji('🔄').setStyle(ButtonStyle.Secondary),
             new ButtonBuilder().setCustomId('back').setLabel('Back').setStyle(ButtonStyle.Secondary)
         )
     ];
