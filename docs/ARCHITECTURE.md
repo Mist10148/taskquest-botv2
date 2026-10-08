@@ -206,7 +206,7 @@ Colours and emoji are defined as constants at the top of the file. Priority colo
 - **Unhandled promise rejections.** Logged. The process continues.
 - **Uncaught exceptions.** Logged, then the process exits after one second.
 - **Graceful shutdown.** Handled only for `SIGINT`. The handler closes the database pool, closes the HTTP server, destroys the Discord client and exits with code 0.
-- **Render shutdown.** Render sends `SIGTERM`, which is not handled. The process ends without closing the pool. See [DEPLOYMENT.md](DEPLOYMENT.md#shutdown).
+- **Render shutdown.** Render sends `SIGTERM`, which is not handled. The process ends without closing the pool. See [DEPLOYMENT.md](DEPLOYMENT.md#7-shutdown).
 
 ## 13. Logging
 
