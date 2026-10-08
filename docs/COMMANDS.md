@@ -70,7 +70,7 @@ The embed colour comes from your class.
 - Ephemeral browser. Previous and next move through the seven classes in order.
 - Action buttons depend on state: equip an owned class, buy a class not yet owned, or open the skill tree.
 - A "Return to Default" button equips the free DEFAULT class.
-- Class purchases and skill purchases are described in [GAMEPLAY.md](GAMEPLAY.md#classes).
+- Class purchases and skill purchases are described in [GAMEPLAY.md](GAMEPLAY.md#3-classes).
 
 ### `/leaderboard`
 
@@ -184,7 +184,7 @@ This is a known issue. See [KNOWN_ISSUES.md](KNOWN_ISSUES.md).
 | `hm_show_<letter>_<timestamp>` | Hangman | Disabled display buttons for the last 10 guesses |
 | `game_back` | Any game screen | Return to the Game Center |
 
-Game rules and payouts are in [GAMEPLAY.md](GAMEPLAY.md#games).
+Game rules and payouts are in [GAMEPLAY.md](GAMEPLAY.md#5-mini-games).
 
 ## Class and skill interactions
 
