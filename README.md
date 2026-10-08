@@ -1,225 +1,199 @@
 # TaskQuest Bot v3.8.3
 
-A gamified Discord task management bot with RPG elements. Manage your tasks through lists, earn XP, level up, pick a class, unlock skills, chase achievements, and play mini-games -- all inside Discord.
+TaskQuest is a Discord task manager with RPG progression. You organise work into lists and items, earn XP for finishing them, pick a class, unlock skills, chase achievements, and play mini-games, all from slash commands inside Discord.
+
+- **Version:** 3.8.3 (see [`package.json`](package.json))
+- **Stack:** Node.js 18+, discord.js 14, MySQL / TiDB via mysql2
+- **Documentation:**
+  - [Product requirements (PRD)](docs/PRD.md)
+  - [Architecture](docs/ARCHITECTURE.md)
+  - [Command and interaction reference](docs/COMMANDS.md)
+  - [Gameplay and progression](docs/GAMEPLAY.md)
+  - [Database schema](docs/DATABASE.md)
+  - [Deployment and configuration](docs/DEPLOYMENT.md)
+  - [Known issues](docs/KNOWN_ISSUES.md)
 
 ## Features
 
-- **Lists & Tasks** -- Create lists, add items, set deadlines & priorities, filter, sort, and search
-- **XP & Leveling** -- Earn XP for completing tasks and playing games, level up automatically
-- **7 RPG Classes** -- Default, Hero, Gambler, Assassin, Wizard, Archer, Tank -- each with unique mechanics
-- **Skill Trees** -- Unlock passive abilities with skill points to boost XP gains
-- **27 Achievements** -- Milestone-based unlocks across lists, tasks, levels, streaks, XP, classes, and games
-- **Mini-Games** -- Blackjack (with full deck simulation), Rock-Paper-Scissors, Hangman
-- **Leaderboards** -- Compete with server members by XP
-- **Daily Rewards** -- Claim daily XP with streak bonuses
-- **Deadline Reminders** -- Automated DM notifications for lists due today
-- **Gamification Toggle** -- Enable or disable XP tracking per user
+- **Lists and items.** Create lists with a description, deadline (`YYYY-MM-DD`), category and priority. Add, edit, describe, complete, delete and reorder items. Filter and sort lists, search by name, and see a progress bar for each list.
+- **XP and levels.** Completing items, creating lists, claiming the daily reward and winning games all award XP. Level is `floor(XP / 100) + 1`.
+- **Seven classes.** Default, Hero, Gambler, Assassin, Wizard, Archer and Tank. Each applies a different XP modifier. Classes are bought with XP and kept permanently.
+- **Skill trees.** Each class has its own tree of skills that you buy with XP. Some skills modify XP; many are not yet implemented (see [Known issues](docs/KNOWN_ISSUES.md)).
+- **Achievements.** 29 milestone achievements across lists, items, completions, XP, levels, streaks, classes and games.
+- **Daily reward.** 100 base XP every 24 hours, with a streak bonus for consecutive days.
+- **Mini-games.** Blackjack (XP bets), Rock-Paper-Scissors, and Hangman.
+- **Leaderboard.** The top 10 players by XP.
+- **Deadline reminders.** A DM each hour for lists due today, for users who have turned on `/automation`.
+- **XP toggle.** `/toggle` turns XP tracking on or off per user. Lists and items still work with it off.
 
 ## Commands
 
-| Command | Description |
-|---------|-------------|
-| `/list` | View all your lists, or view a specific list by name |
-| `/profile` | View your stats (XP, level, class, streak, achievements) |
-| `/daily` | Claim your daily XP reward (24h cooldown, streak bonuses) |
-| `/class` | View, buy, or equip RPG classes |
-| `/skills` | Browse and unlock skills from your class skill tree |
-| `/achievements` | View all achievements and your unlock progress |
-| `/leaderboard` | Server XP rankings |
-| `/game` | Game center -- play Blackjack, Rock-Paper-Scissors, or Hangman |
-| `/automation` | Toggle deadline reminder DMs |
-| `/toggle` | Enable or disable the gamification system |
-| `/ping` | Check bot latency |
-| `/app` | Link to the TaskQuest web dashboard |
-| `/help` | Show command reference |
+| Command | What it does |
+|---|---|
+| `/list [name]` | Open the lists overview, or open one list by name (autocomplete). |
+| `/game` | Game centre: Blackjack, Rock-Paper-Scissors, Hangman. Resumes an active Blackjack hand. |
+| `/profile [user]` | Profile dashboard for yourself or another user. Public. |
+| `/daily` | Claim the daily XP reward. |
+| `/class` | Browse classes, buy and equip them, and open each class's skill tree. |
+| `/achievements` | Paginated achievement list with unlock status. |
+| `/leaderboard` | Top 10 players by XP. Public. |
+| `/automation` | Toggle deadline reminder DMs. |
+| `/toggle` | Turn the XP system on or off. |
+| `/ping` | Show bot and API latency. |
+| `/app` | Link to the TaskQuest web dashboard (`WEB_APP_URL`). |
+| `/help` | Command reference. Public. |
+
+There is no `/skills` command. Skill trees are opened from `/class`. The full reference, including every button and menu, is in [docs/COMMANDS.md](docs/COMMANDS.md).
 
 ## Classes
 
 | Class | Cost | Mechanic |
-|-------|------|----------|
-| Default | Free | No bonus (starter class) |
-| Hero | 500 XP | +25 flat XP per action |
-| Gambler | 300 XP | Random 0.5x-2x XP multiplier |
-| Assassin | 400 XP | Streak stacking (+5% per stack, max 10) |
-| Wizard | 700 XP | Spell combos -- every 3rd task gives bonus, every 5th gives 2x |
-| Archer | 600 XP | Crit system with streak bonuses |
-| Tank | 500 XP | Shield momentum stacking (4% per stack + flat bonus) |
+|---|---|---|
+| Default | Free | No modifier. Starter class. |
+| Hero | 500 XP | +25 flat XP per completed task. |
+| Gambler | 300 XP | Random bonus, with a 20% chance that the XP reward is reduced instead. |
+| Assassin | 400 XP | Streak stacks add +5% of base XP per stack, up to 10 stacks. |
+| Wizard | 700 XP | Every 3rd action adds a wisdom bonus. Every 5th adds double that. |
+| Archer | 600 XP | Hit or miss roll on each action. Hits build a streak with a headshot chance. |
+| Tank | 500 XP | Stacks rise per action (up to a cap) for a percentage bonus plus a flat bonus. |
 
-## Prerequisites
+Exact formulas are in [docs/GAMEPLAY.md](docs/GAMEPLAY.md).
 
-- [Node.js](https://nodejs.org/) v18.0.0 or higher
-- MySQL database (local via [XAMPP](https://www.apachefriends.org/) or cloud via Aiven, PlanetScale, Railway, AWS, etc.)
-- A [Discord application](https://discord.com/developers/applications) with a bot token
+## Quick start
 
-## Setup
+### Prerequisites
 
-### 1. Create a Discord Application
+- [Node.js](https://nodejs.org/) 18.0.0 or later
+- A MySQL-compatible database: local (for example [XAMPP](https://www.apachefriends.org/)) or cloud (for example Aiven, Railway, TiDB Cloud, AWS RDS)
+- A [Discord application](https://discord.com/developers/applications) with a bot user
 
-1. Go to the [Discord Developer Portal](https://discord.com/developers/applications)
-2. Click **New Application** and give it a name
-3. Go to the **Bot** tab and click **Add Bot**
-4. Copy the **bot token**
-5. Copy the **Application ID** (from General Information)
-6. Under **Privileged Gateway Intents**, enable all intents
-7. Go to **OAuth2 > URL Generator**, select the `bot` and `applications.commands` scopes, then invite the bot to your server
+### 1. Create the Discord application
 
-### 2. Install Dependencies
+1. In the [Developer Portal](https://discord.com/developers/applications), click **New Application**.
+2. Open the **Bot** tab, click **Reset Token** or **Add Bot**, and copy the token.
+3. Copy the **Application ID** from **General Information**. This is your `CLIENT_ID`.
+4. Under **Bot > Privileged Gateway Intents**, enable **Server Members Intent**. This is the only privileged intent the bot needs. Guilds and direct messages are non-privileged.
+5. Under **OAuth2 > URL Generator**, select the `bot` and `applications.commands` scopes. Use the generated URL to invite the bot to a server.
+
+### 2. Install
 
 ```bash
+git clone <your-repo-url> taskquest-bot
 cd taskquest-bot
 npm install
 ```
 
-### 3. Configure Environment Variables
+### 3. Configure
 
 ```bash
 cp .env.example .env
 ```
 
-Edit `.env` and fill in the required values:
+Fill in at least `DISCORD_TOKEN`, `CLIENT_ID` and the database settings. The full list is in the [configuration table](#configuration) below and in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
-```env
-# Required
-DISCORD_TOKEN=your_discord_bot_token_here
-CLIENT_ID=your_application_client_id_here
+Never commit `.env`. It is listed in `.gitignore`.
 
-# Optional (for dev -- instant command updates on one server)
-GUILD_ID=your_test_server_id
+### 4. Create the database
 
-# Database -- Option A: Local MySQL (XAMPP)
-DB_HOST=localhost
-DB_PORT=3306
-DB_USER=root
-DB_PASSWORD=
-DB_NAME=taskquest_bot
+- **Local (XAMPP):** start MySQL, create a database named `taskquest_bot`, and leave the `DB_*` defaults.
+- **Cloud:** create a database on your provider, set `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD` and `DB_NAME` (or `DB_URL`), and set `DB_SSL=true` if the provider requires TLS.
 
-# Database -- Option B: Cloud MySQL (uncomment and use instead)
-# DB_URL=mysql://username:password@hostname:port/database
-# DB_SSL=true
-# DB_SSL_REJECT_UNAUTHORIZED=true
-```
+The bot creates its tables on first start. Automatic creation does **not** create every table the blackjack feature needs. To get the full schema, apply [`database/schema.sql`](database/schema.sql) manually. See [docs/DATABASE.md](docs/DATABASE.md#auto-created-versus-schemasql).
 
-See `.env.example` for all available options including pool size, timezone, logging level, and web app URL.
-
-### 4. Set Up the Database
-
-**Local (XAMPP):**
-1. Start XAMPP and enable MySQL
-2. Open phpMyAdmin and create a database called `taskquest_bot`
-3. The bot auto-creates all tables on first run
-
-**Cloud:**
-1. Create a MySQL database on your provider
-2. Set the `DB_*` variables (or `DB_URL`) in `.env`
-3. Set `DB_SSL=true` for cloud connections
-4. Tables are auto-created on first run
-
-### 5. Deploy Slash Commands
+### 5. Register slash commands
 
 ```bash
-# Global deployment (takes up to 1 hour to propagate)
-npm run deploy
-
-# Guild-specific deployment (instant, for development)
-npm run deploy
-# Make sure GUILD_ID is set in .env
+npm run deploy                 # global: can take up to an hour to appear
+GUILD_ID=<server id> npm run deploy   # guild: appears immediately, good for development
 ```
 
-### 6. Start the Bot
+`deploy-commands.js` also accepts the guild ID as an argument in the form `--guild=<id>`. Each run first clears the global command set, so the most recent deployment is the one that counts.
+
+### 6. Run
 
 ```bash
-# Production
-npm start
-
-# Development (auto-restarts on file changes)
-npm run dev
+npm start      # production
+npm run dev    # restarts on file changes (node --watch)
 ```
 
-The bot will:
-1. Start an HTTP keep-alive server on port 3000
-2. Connect to MySQL and initialize tables
-3. Log in to Discord
-4. Begin checking deadlines every hour
+On startup the bot:
 
-## Project Structure
+1. Starts an HTTP server on `PORT` (default 3000) that returns a small JSON status.
+2. Logs in to Discord.
+3. When ready, connects to the database and creates missing tables.
+4. Starts the deadline reminder check (first run after 5 seconds, then hourly), the old-list cleanup (every 24 hours) and the game-session expiry sweep (every 15 minutes).
+
+## Configuration
+
+| Variable | Required | Default | Purpose |
+|---|---|---|---|
+| `DISCORD_TOKEN` | Yes | none | Bot token. The process exits at startup if it is missing. |
+| `CLIENT_ID` | For deploy | none | Application ID, used by `deploy-commands.js`. |
+| `GUILD_ID` | No | none | Guild ID for instant command deployment. |
+| `DB_HOST` | Yes (unless `DB_URL`) | `localhost` | MySQL host. |
+| `DB_PORT` | No | `3306` | MySQL port. |
+| `DB_USER` | Yes (unless `DB_URL`) | `root` | MySQL user. |
+| `DB_PASSWORD` | Yes (unless `DB_URL`) | empty | MySQL password. |
+| `DB_NAME` | Yes (unless `DB_URL`) | `taskquest_bot` | MySQL database. |
+| `DB_URL` | No | none | Connection URL. Used instead of the individual `DB_*` values. |
+| `DB_SSL` | No | off | Set to `true` to enable TLS. |
+| `DB_SSL_REJECT_UNAUTHORIZED` | No | `true` | Set to `false` to accept self-signed certificates. |
+| `WEB_APP_URL` | No | `https://taskquest.app` | Link target for `/app`. |
+| `PORT` | No | `3000` | HTTP status server port. |
+
+`.env.example` also lists `DB_POOL_SIZE`, `DB_TIMEZONE` and `LOG_LEVEL`. The current code does not read them. See [Known issues](docs/KNOWN_ISSUES.md).
+
+## Project structure
 
 ```
 taskquest-bot/
-├── index.js               # Entry point -- client setup, event handlers, keep-alive server
-├── deploy-commands.js     # Deploys slash commands to Discord API
-├── package.json
-├── .env.example           # Environment variable template
-├── render.yaml            # Render.com deployment blueprint
+├── index.js                  Entry point: client, HTTP status server, timers, interaction routing
+├── deploy-commands.js        Registers slash commands with the Discord API
 ├── commands/
-│   ├── list.js            # /list command -- list & item CRUD, filtering, sorting, search
-│   ├── gamification.js    # /profile, /class, /skills, /achievements, /daily, /leaderboard, etc.
-│   └── game.js            # /game command -- Blackjack, RPS, Hangman
+│   ├── list.js               /list: lists, items, filters, search, modals
+│   ├── game.js               /game: Blackjack, Rock-Paper-Scissors, Hangman
+│   └── gamification.js       /ping /daily /automation /profile /achievements /class /leaderboard /toggle /help /app
 ├── database/
-│   ├── db.js              # Connection pool, query helpers, table initialization
-│   └── schema.sql         # Full database schema reference
-└── utils/
-    ├── ui.js              # Discord embed builders for all UI
-    ├── gameLogic.js       # Class mechanics, skill trees, achievements, XP calculations
-    └── games/
-        ├── deck.js            # Card deck for Blackjack
-        ├── sessionManager.js  # Game session tracking & state
-        └── xpTransaction.js   # XP transaction logging
+│   ├── db.js                 Connection pool, table creation, query helpers
+│   └── schema.sql            Reference schema with foreign keys and indexes
+├── utils/
+│   ├── gameLogic.js          Classes, skill trees, achievements, XP formulas
+│   ├── gamification.js       Older copy of commands/gamification.js; not imported by index.js
+│   ├── ui.js                 Embeds, buttons, menus, colours and emoji
+│   └── games/
+│       ├── deck.js           Card deck, hand values, dealer logic
+│       ├── sessionManager.js Game session lifecycle and expiry
+│       └── xpTransaction.js  Locked XP transactions with an audit log
+├── docs/                     Product and technical documentation
+├── render.yaml               Render blueprint (worker service)
+└── .env.example              Environment variable template
 ```
 
 ## Database
 
-The bot uses MySQL with the following tables (auto-created on startup):
+MySQL 8, MariaDB and TiDB are the targets. Seven tables are created automatically: `users`, `lists`, `items`, `achievements`, `user_skills`, `game_sessions` and `xp_transactions`. Blackjack also needs a `blackjack_hands` table, which only `schema.sql` creates. The full reference is in [docs/DATABASE.md](docs/DATABASE.md).
 
-| Table | Purpose |
-|-------|---------|
-| `users` | Player stats, class, XP, level, streak, settings |
-| `lists` | Task lists with deadlines, priorities, categories |
-| `items` | Individual tasks within lists |
-| `user_skills` | Unlocked skill tree abilities per user |
-| `achievements` | Achievement unlock tracking |
-| `game_sessions` | Active and past game sessions |
-| `blackjack_hands` | Detailed Blackjack game state |
-| `xp_transactions` | Immutable XP change log |
+## Deployment
 
-## Deployment (Render.com)
+The repository includes [`render.yaml`](render.yaml), a Render blueprint for a background worker.
 
-The included `render.yaml` provides a ready-made blueprint.
+1. Push the repository to GitHub or GitLab.
+2. On Render, choose **New > Blueprint** and connect the repository, or create a **Background Worker** manually with build command `npm install` and start command `npm start`.
+3. Add the environment variables from the configuration table.
 
-1. Push to a GitHub/GitLab repo
-2. On Render, create a **New Blueprint Instance** and connect the repo
-3. Or manually create a **Background Worker**:
-   - **Build Command:** `npm install`
-   - **Start Command:** `npm start`
-4. Add environment variables:
-   - `DISCORD_TOKEN`
-   - `CLIENT_ID`
-   - `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`
-   - `DB_SSL=true`
+Render sends `SIGTERM` when it stops a service. The bot only handles `SIGINT`, so shutdown is not graceful on Render. Details are in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
-The bot includes a built-in HTTP keep-alive server on port 3000 to prevent free-tier services from sleeping.
+## Troubleshooting
 
-## Environment Variables Reference
+- **Commands do not appear.** Global deployments take up to an hour. Use `GUILD_ID` for instant updates while developing.
+- **`Missing DISCORD_TOKEN` at startup.** The `.env` file is missing or the variable is blank.
+- **Blackjack fails with a missing table or column.** Apply `database/schema.sql` to the database.
+- **Members are shown as "Unknown User" on the leaderboard.** The bot cannot fetch those members. Check that the Server Members intent is enabled.
+- **Slash command `--guild` argument ignored.** Use `--guild=<id>` (with `=`), or set `GUILD_ID`.
 
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `DISCORD_TOKEN` | Yes | -- | Bot token from Discord Developer Portal |
-| `CLIENT_ID` | Yes | -- | Application ID from Discord Developer Portal |
-| `GUILD_ID` | No | -- | Server ID for instant dev command deployment |
-| `DB_HOST` | Yes* | `localhost` | MySQL host |
-| `DB_PORT` | No | `3306` | MySQL port |
-| `DB_USER` | Yes* | `root` | MySQL username |
-| `DB_PASSWORD` | Yes* | -- | MySQL password |
-| `DB_NAME` | Yes* | `taskquest_bot` | MySQL database name |
-| `DB_URL` | No | -- | Full connection string (alternative to individual DB vars) |
-| `DB_SSL` | No | `false` | Enable SSL for cloud databases |
-| `DB_SSL_REJECT_UNAUTHORIZED` | No | `true` | Reject unauthorized SSL certs |
-| `DB_POOL_SIZE` | No | `10` | Connection pool size |
-| `DB_TIMEZONE` | No | `UTC` | Database timezone |
-| `LOG_LEVEL` | No | `info` | Logging level |
-| `WEB_APP_URL` | No | -- | URL for the `/app` command |
-| `PORT` | No | `3000` | Keep-alive HTTP server port |
+## Contributing
 
-*Required unless `DB_URL` is provided.
+Open an issue or pull request. Keep changes focused, and update the matching file in `docs/` when behaviour changes.
 
 ## License
 
